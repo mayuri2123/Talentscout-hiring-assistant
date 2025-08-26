@@ -1,77 +1,80 @@
-import os
 import re
-import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
+from cryptography.fernet import Fernet
+import os
 
-# Optional encryption via cryptography.Fernet if available and enabled
-def _get_fernet():
-    try:
-        from cryptography.fernet import Fernet
-    except Exception:
-        return None
-    key = os.getenv("ENCRYPTION_KEY")
-    enabled = os.getenv("ENABLE_ENCRYPTION", "false").lower() == "true"
-    if not enabled or not key:
-        return None
-    try:
-        return Fernet(key.encode() if isinstance(key, str) else key)
-    except Exception:
-        return None
+# -----------------------------
+# Regex patterns (precompiled for speed)
+# -----------------------------
+EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+PHONE_PATTERN = re.compile(r"(?:\+?\d{1,3}[-.\s]?)?(?:\d{10,})")
+EXPERIENCE_PATTERN = re.compile(r"(\d+(\.\d+)?)\s*(?:years|yrs|year)?", re.IGNORECASE)
 
-FERNET = _get_fernet()
-
-def secure_store(candidate_dict: Dict[str, Any]) -> Dict[str, Any]:
-    if not FERNET:
-        return candidate_dict
-    safe = candidate_dict.copy()
-    for k in ("email","phone"):
-        if safe.get(k):
-            safe[k] = FERNET.encrypt(str(safe[k]).encode()).decode()
-    return safe
-
-def safe_display(value: Optional[str]) -> str:
-    return str(value) if value not in (None, "", "None") else "⚠️ Missing"
-
-def detect_exit(text: str) -> bool:
-    text = text.strip().lower()
-    exits = ["exit","quit","stop","bye","goodbye","end"]
-    return any(x == text or x in text for x in exits)
-
-EMAIL_RE = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
-PHONE_RE = re.compile(r"(\+?\d[\d\-\s]{7,}\d)")
-EXP_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)", re.I)
-
+# -----------------------------
+# Extraction Functions
+# -----------------------------
 def extract_email(text: str) -> Optional[str]:
-    m = EMAIL_RE.search(text)
-    return m.group(0) if m else None
+    """Extract first valid email from text."""
+    match = EMAIL_PATTERN.search(text)
+    return match.group(0) if match else None
 
 def extract_phone(text: str) -> Optional[str]:
-    m = PHONE_RE.search(text)
-    return m.group(0) if m else None
+    """Extract first valid phone number (10+ digits)."""
+    match = PHONE_PATTERN.search(text)
+    if match:
+        num = re.sub(r"[^\d+]", "", match.group(0))
+        if len(num) >= 10:
+            return num
+    return None
 
 def extract_experience(text: str) -> Optional[float]:
-    # match patterns like "2", "2.5", "2 years"
-    m = EXP_RE.search(text)
-    if m:
+    """Extract years of experience (supports '2', '2.5', '2 years', etc.)."""
+    match = EXPERIENCE_PATTERN.search(text)
+    if match:
         try:
-            return float(m.group(1))
-        except Exception:
-            pass
-    # fallback: bare number like "2.5"
-    t = text.strip()
-    try:
-        if any(c.isdigit() for c in t):
-            # pick first float-like token
-            for tok in re.findall(r"\d+(?:\.\d+)?", t):
-                return float(tok)
-    except Exception:
-        return None
+            return float(match.group(1))
+        except ValueError:
+            return None
     return None
 
-def next_missing_field(cand: Dict[str, Any]) -> Optional[str]:
-    order = ["full_name","email","phone","experience","position","location","tech_stack"]
+# -----------------------------
+# Field Handling
+# -----------------------------
+def next_missing_field(c: Dict) -> Optional[str]:
+    """Return the next missing candidate field (order matters)."""
+    order = ["full_name", "email", "phone", "experience", "position", "location", "tech_stack"]
     for f in order:
-        v = cand.get(f, None)
-        if v in (None, "", "None") or (f == "experience" and v is None):
+        if not c.get(f):
             return f
     return None
+
+def detect_exit(text: str) -> bool:
+    """Check if text is an exit command."""
+    exit_words = ["exit", "quit", "stop", "bye", "goodbye", "end"]
+    return text.strip().lower() in exit_words
+
+# -----------------------------
+# Secure Storage (Encryption)
+# -----------------------------
+def secure_store(data: dict) -> dict:
+    """Encrypt sensitive fields if ENABLE_ENCRYPTION is set."""
+    if not os.getenv("ENABLE_ENCRYPTION", "").lower() == "true":
+        return data
+
+    key = os.getenv("ENCRYPTION_KEY")
+    if not key:
+        raise RuntimeError("Encryption enabled but no ENCRYPTION_KEY provided.")
+
+    f = Fernet(key.encode())
+    stored = data.copy()
+    for field in ["email", "phone"]:
+        if stored.get(field):
+            stored[field] = f.encrypt(stored[field].encode()).decode()
+    return stored
+
+# -----------------------------
+# Safe Display (for UI)
+# -----------------------------
+def safe_display(value: Optional[str]) -> str:
+    """Return value if present, else '⚠️ Missing'."""
+    return value if value else "⚠️ Missing"
