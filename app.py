@@ -3,12 +3,12 @@ import json
 import base64
 import io
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 
 import streamlit as st
 from pydantic import BaseModel, EmailStr
 
-from prompts import SYSTEM_PROMPT, TECH_QA_PROMPT
+from prompts import SYSTEM_PROMPT
 from llm import chat, LLMUnavailable
 from utils import (
     extract_email, extract_phone, extract_experience, next_missing_field,
@@ -33,7 +33,7 @@ class Candidate(BaseModel):
     location: Optional[str] = None
     tech_stack: Optional[str] = None
 
-    def is_complete(self):
+    def is_complete(self) -> bool:
         return all([
             self.full_name, self.email, self.phone,
             self.experience is not None, self.position,
@@ -53,40 +53,6 @@ if "last_input" not in st.session_state:
     st.session_state.last_input = None
 
 # ----------------------------------
-# 🚀 Exit Page Helpers
-# ----------------------------------
-def make_json_download_button(data: dict, filename: str = "candidate_profile.json", label: str = "⬇️ Download your profile JSON"):
-    buf = io.BytesIO(json.dumps(data, indent=2).encode("utf-8"))
-    b64 = base64.b64encode(buf.getvalue()).decode()
-    href = f'<a download="{filename}" href="data:file/json;base64,{b64}" style="text-decoration:none">{label}</a>'
-    st.markdown(href, unsafe_allow_html=True)
-
-def show_exit_screen():
-    st.markdown("""
-    <div style="text-align:center; padding:32px">
-      <h2>✅ Thanks for your time!</h2>
-      <p>We’ve captured your details. Our team will review and reach out with the next steps.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("### Your Profile Snapshot")
-    st.code(json.dumps(st.session_state.candidate.dict(), indent=2), language="json")
-    make_json_download_button(st.session_state.candidate.dict())
-
-    redirect = os.getenv("EXIT_REDIRECT_URL")
-    colA, colB = st.columns([1, 1])
-    with colA:
-        if redirect and st.button("🏁 Go to Next Step / Portal"):
-            st.markdown(f"<meta http-equiv='refresh' content='0; url={redirect}'>", unsafe_allow_html=True)
-    with colB:
-        if st.button("🔄 Start Over"):
-            for k in list(st.session_state.keys()):
-                del st.session_state[k]
-            st.rerun()
-
-    st.stop()
-
-# ----------------------------------
 # Styles
 # ----------------------------------
 st.markdown("""
@@ -99,20 +65,23 @@ st.markdown("""
 [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p, [data-testid="stSidebar"] li {
   color: #fff !important;
 }
-/* Header */
-.main-header {
-  background: linear-gradient(120deg, #2E86C1, #1B4F72);
-  padding: 24px 20px;
-  border-radius: 14px;
-  text-align: center;
-  color: white;
-  margin-bottom: 16px;
+/* Hero */
+.hero {
+  background:#0b1f3a;
+  padding:60px 20px;
+  text-align:center;
+  border-radius:12px;
+  margin-bottom:18px;
+  color:white;
 }
-.tagline {
-  font-size: 15px;
-  color: #eaf2f8;
-  margin-top: -6px;
+.hero h1{ margin:0 0 6px 0; }
+.hero p{ color:#d6dce5; font-size:18px; margin: 8px 0 22px 0; }
+.hero .cta {
+  background:#e74c3c;
+  color:white; border:none; padding:12px 24px;
+  border-radius:25px; font-weight:700; font-size:16px; cursor:pointer;
 }
+
 /* Candidate card */
 .card {
   background: #f7f9fb;
@@ -120,6 +89,7 @@ st.markdown("""
   border-radius: 12px;
   padding: 14px 16px;
 }
+
 /* Chat */
 .chat-wrap {
   height: 460px;
@@ -146,6 +116,7 @@ st.markdown("""
   margin-left: auto;
   max-width: 85%;
 }
+
 /* Buttons */
 .stButton>button {
   background: #2E86C1;
@@ -158,14 +129,65 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ----------------------------------
+# 🚀 Exit Page Helpers
+# ----------------------------------
+def make_json_download_button(data: dict, filename: str = "candidate_profile.json", label: str = "⬇️ Download your profile JSON"):
+    buf = io.BytesIO(json.dumps(data, indent=2).encode("utf-8"))
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    href = f'<a download="{filename}" href="data:file/json;base64,{b64}" style="text-decoration:none">{label}</a>'
+    st.markdown(href, unsafe_allow_html=True)
+
+def show_exit_screen():
+    st.markdown("""
+    <div style="text-align:center; padding:32px">
+      <h2>✅ Thanks for your time!</h2>
+      <p>We’ve captured your details. Here’s what happens next:</p>
+      <ol style="text-align:left; display:inline-block;">
+        <li>Recruiter reviews your profile</li>
+        <li>We schedule an interview</li>
+        <li>Technical + HR interview rounds</li>
+        <li>Offer decision</li>
+      </ol>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("### Your Profile Snapshot")
+    st.code(json.dumps(st.session_state.candidate.dict(), indent=2), language="json")
+    make_json_download_button(st.session_state.candidate.dict())
+
+    redirect = os.getenv("EXIT_REDIRECT_URL")
+    colA, colB = st.columns([1, 1])
+    with colA:
+        if redirect and st.button("🏁 Go to Next Step / Portal"):
+            st.markdown(f"<meta http-equiv='refresh' content='0; url={redirect}'>", unsafe_allow_html=True)
+    with colB:
+        if st.button("🔄 Start Over"):
+            for k in list(st.session_state.keys()):
+                del st.session_state[k]
+            st.rerun()
+
+    st.stop()
+
+# ----------------------------------
+# Hero (Taira-like)
+# ----------------------------------
+st.markdown(f"""
+<div class="hero">
+  <h1>🧭 TalentScout — Virtual Hiring Assistant</h1>
+  <p>AI-powered recruitment: collect candidate details and assess skills with tailored technical questions.</p>
+  <a href="#chat"><button class="cta">🚀 Start Interview</button></a>
+</div>
+""", unsafe_allow_html=True)
+
+# ----------------------------------
 # Sidebar
 # ----------------------------------
 with st.sidebar:
     st.markdown("## 💡 How to use")
     st.markdown("""
-- Type your responses in the chat box.
-- You can answer multiple fields at once or one-by-one.
-- Say **exit** to end the chat gracefully.
+- Answer the questions the assistant asks (you can provide multiple details at once).
+- Say **exit** to finish anytime (you'll see a summary + next steps).
+- When complete, you can **save** your profile to JSON.
 """)
     if st.session_state.candidate.is_complete():
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -179,21 +201,59 @@ with st.sidebar:
             st.success(f"Profile saved to `{path}`")
 
 # ----------------------------------
-# Header
+# Finish & Exit button (always visible)
 # ----------------------------------
-st.markdown("<div class='main-header'><h1>🧭 TalentScout — AI Hiring Assistant</h1><p class='tagline'>Collect candidate info and assess skills with tailored technical questions</p></div>", unsafe_allow_html=True)
-
-# 🚀 Finish & Exit button always available
 top_left, top_right = st.columns([3,1])
 with top_right:
     if st.button("Finish & Exit", use_container_width=True):
         show_exit_screen()
 
-left, right = st.columns([1, 2])
+# ----------------------------------
+# Progress bar (profile completeness)
+# ----------------------------------
+def _completion_ratio(c: Candidate) -> float:
+    vals = c.dict()
+    total = len(vals)
+    filled = sum(1 for k, v in vals.items() if (v is not None and v != ""))
+    return filled / total if total else 0.0
+
+st.progress(_completion_ratio(st.session_state.candidate))
 
 # ----------------------------------
-# Candidate summary
+# Greeting (first message)
 # ----------------------------------
+if not st.session_state.messages:
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": "👋 Hi! I’m TalentScout, your virtual recruiter. Let’s start with the basics — what’s your **full name**?"
+    })
+
+# ----------------------------------
+# Helper: next recruiter-style question
+# ----------------------------------
+def next_recruiter_question(cand: Candidate) -> Optional[str]:
+    if not cand.full_name:
+        return "Great to meet you! What’s your **full name**?"
+    if not cand.email:
+        return "Thanks! What’s the best **email address** to contact you?"
+    if not cand.phone:
+        return "Perfect. Could you provide your **phone number** (with country code if possible)?"
+    if cand.experience is None:
+        return "Nice. How many **years of professional experience** do you have?"
+    if not cand.position:
+        return "Got it. What **position or role** are you applying for?"
+    if not cand.location:
+        return "Thanks. Where are you currently **located** (city/country)?"
+    if not cand.tech_stack:
+        return "Awesome. Please list your **tech stack** — languages, frameworks, databases, and tools."
+    return None
+
+# ----------------------------------
+# Layout
+# ----------------------------------
+left, right = st.columns([1, 2])
+
+# Candidate Summary (left)
 with left:
     st.markdown("### 📝 Candidate Summary")
     c = st.session_state.candidate
@@ -209,69 +269,87 @@ with left:
     </div>
     """, unsafe_allow_html=True)
 
-# ----------------------------------
-# Greeting
-# ----------------------------------
-if not st.session_state.messages:
-    st.session_state.messages.append({"role": "assistant", "content": "Hello! I’m TalentScout, your AI hiring assistant. I’ll collect your details and ask you technical questions based on your tech stack. You can type 'exit' anytime to finish."})
-
-# ----------------------------------
-# Right column (chat)
-# ----------------------------------
+# Chat (right)
 with right:
+    st.markdown("<div id='chat'></div>", unsafe_allow_html=True)
     st.markdown("### 💬 Interview Assistant")
+
     st.markdown("<div class='chat-wrap'>", unsafe_allow_html=True)
     for msg in st.session_state.messages:
-        css_class = "assistant" if msg["role"] == "assistant" else "user"
-        st.markdown(f"<div class='bubble {css_class}'>{msg['content']}</div>", unsafe_allow_html=True)
+        role = msg["role"]
+        css_class = "assistant" if role == "assistant" else "user"
+        avatar = "🤖" if role == "assistant" else "👤"
+        st.markdown(f"<div class='bubble {css_class}'>{avatar} {msg['content']}</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    user_input = st.text_input("Type your message and press Enter")
+    # Friendly input label
+    user_input = st.text_input("✍️ Your answer:", key="chat_input")
 
     if user_input and user_input != st.session_state.last_input:
         st.session_state.last_input = user_input
         st.session_state.messages.append({"role": "user", "content": user_input})
 
-        # 🚀 Exit flow
+        # Exit flow
         if detect_exit(user_input):
             show_exit_screen()
 
-        # 🚀 Process multiple inputs in one go
-        # Split by comma or newline for batch input
+        # Process multiple inputs in one go (fast + user-friendly)
+        cand = st.session_state.candidate
         for piece in [p.strip() for p in user_input.replace("\n", ",").split(",") if p.strip()]:
             email = extract_email(piece)
             phone = extract_phone(piece)
             exp = extract_experience(piece)
 
-            if email:
-                c.email = email
-            elif phone:
-                c.phone = phone
-            elif exp is not None:
-                c.experience = exp
-            elif any(k in piece.lower() for k in ["engineer","developer","scientist","analyst","intern","manager"]):
-                c.position = c.position or piece
-            elif any(k in piece.lower() for k in ["python","java","sql","django","flask","react","node","pytorch","tensorflow","pandas","numpy","ml"]):
-                c.tech_stack = c.tech_stack or piece
-            elif any(k in piece.lower() for k in ["nagpur","pune","mumbai","delhi","bangalore","hyderabad","remote","india","usa","uk"]):
-                c.location = c.location or piece
-            elif " " in piece and not c.full_name:
-                c.full_name = piece.title()
+            if email and not cand.email:
+                cand.email = email
+                continue
+            if phone and not cand.phone:
+                cand.phone = phone
+                continue
+            if exp is not None and cand.experience is None:
+                cand.experience = exp
+                continue
 
-        # 🚀 Efficiently decide assistant reply
-        try:
-            system = SYSTEM_PROMPT
-            messages = [{"role":"system","content": system}] + st.session_state.messages[-5:]
-            reply = chat(system_prompt=system, messages=messages, temperature=0.2, max_tokens=300)
-        except LLMUnavailable:
-            reply = "Got it ✅ Please continue..."
+            # Lightweight heuristics for other fields
+            lower = piece.lower()
+            if any(k in lower for k in ["engineer", "developer", "scientist", "analyst", "intern", "manager"]) and not cand.position:
+                cand.position = piece
+                continue
+            if any(k in lower for k in ["python","java","sql","django","flask","react","node","pytorch","tensorflow","pandas","numpy","ml","scikit","mongodb","mysql","postgres"]) and not cand.tech_stack:
+                cand.tech_stack = piece
+                continue
+            if any(k in lower for k in ["nagpur","pune","mumbai","delhi","bangalore","hyderabad","remote","india","usa","uk","london","new york"]) and not cand.location:
+                cand.location = piece
+                continue
+            # Assume full name if it looks like two+ words and name not set
+            if " " in piece and not cand.full_name and not any(ch.isdigit() for ch in piece):
+                cand.full_name = piece.title()
 
-        # 🚀 Ask tech questions only once
-        if c.tech_stack and not st.session_state.asked_tech_questions:
-            qs = generate_fallback_questions(c.tech_stack, max_questions=5)
-            st.session_state.messages.append({"role": "assistant", "content": "Great! Based on your tech stack, here are some questions:\n" + "\n".join([f"{i+1}. {q}" for i,q in enumerate(qs)])})
-            st.session_state.asked_tech_questions = True
+        # Decide next message
+        nxt = next_recruiter_question(cand)
+        if nxt:
+            # Keep it snappy without always calling LLM
+            st.session_state.messages.append({"role": "assistant", "content": nxt})
         else:
-            st.session_state.messages.append({"role": "assistant", "content": reply})
+            # Candidate profile is complete
+            if not st.session_state.asked_tech_questions:
+                # Ask tailored questions (fallback)
+                qs = generate_fallback_questions(cand.tech_stack, max_questions=5)
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": "Great! Based on your tech stack, here are some questions:\n" +
+                               "\n".join([f"{i+1}. {q}" for i, q in enumerate(qs)])
+                })
+                st.session_state.asked_tech_questions = True
+            else:
+                # Optionally ask LLM for a follow-up/context message (short history for speed)
+                try:
+                    system = SYSTEM_PROMPT
+                    messages = [{"role":"system","content": system}] + st.session_state.messages[-5:]
+                    reply = chat(system_prompt=system, messages=messages, temperature=0.2, max_tokens=300)
+                except LLMUnavailable:
+                    reply = "Thanks! Please answer the questions above. Type **exit** whenever you’re done."
+                st.session_state.messages.append({"role": "assistant", "content": reply})
 
+        # Refresh UI
         st.rerun()
