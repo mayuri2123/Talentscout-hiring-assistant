@@ -85,4 +85,5 @@ talentscout/
 
 ## License
 
-For assignment/demo use.
+For assignment/demo use.👉 [Watch the Loom Demo](https://www.loom.com/share/92bf9842815947c0b9c4476354027462?sid=a2048262-26b2-4d7e-b0f7-c2aa9b4dea68)  
+
